@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>PipelineOS — CI/CD Tracker</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0a0c0f;
+      --surface:   #0f1318;
+      --panel:     #131920;
+      --border:    #1e2a36;
+      --border2:   #243040;
+      --green:     #00ff88;
+      --green-dim: #00c96a;
+      --red:       #ff3b5c;
+      --yellow:    #ffd060;
+      --blue:      #38b2ff;
+      --purple:    #a78bfa;
+      --text:      #c8d8e8;
+      --text-dim:  #5a7080;
+      --text-muted:#3a4f60;
+      --glow-g:    0 0 16px #00ff8844;
+      --glow-r:    0 0 16px #ff3b5c44;
+      --glow-b:    0 0 16px #38b2ff44;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'JetBrains Mono', monospace;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.07) 2px,
+        rgba(0,0,0,0.07) 4px
+      );
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    /* TOPBAR */
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 28px;
+      height: 52px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: var(--green);
+      text-shadow: var(--glow-g);
+    }
+
+    .logo-icon {
+      width: 28px; height: 28px;
+      border: 2px solid var(--green);
+      border-radius: 6px;
+      display: grid;
+      place-items: center;
+      font-size: 13px;
+      box-shadow: var(--glow-g);
+    }
+
+    .topbar-center {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    .status-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: var(--glow-g);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%,100% { opacity:1; }
+      50%      { opacity:.4; }
+    }
+
+    .topbar-right {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    .clock { color: var(--blue); font-size: 12px; }
+
+    /* LAYOUT */
+    .shell {
+      display: grid;
+      grid-template-columns: 220px 1fr;
+      min-height: calc(100vh - 52px);
+    }
+
+    /* SIDEBAR */
+    .sidebar {
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      padding: 20px 0;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .sidebar-section {
+      padding: 6px 16px 4px;
+      font-size: 9px;
+      letter-spacing: 0.14em;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      margin-top: 12px;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 16px;
+      font-size: 12px;
+      color: var(--text-dim);
+      cursor: pointer;
+      border-left: 2px solid transparent;
+      transition: all .15s;
+    }
+
+    .nav-item:hover { background: var(--panel); color: var(--text); }
+    .nav-item.active {
+      background: var(--panel);
+      color: var(--green);
+      border-left-color: var(--green);
+      text-shadow: var(--glow-g);
+    }
+
+    .nav-item .badge {
+      margin-left: auto;
+      background: var(--red);
+      color: #fff;
+      font-size: 9px;
+      padding: 1px 5px;
+      border-radius: 10px;
+    }
+
+    .nav-item .badge.ok {
+      background: #1a3a28;
+      color: var(--green);
+    }
+
+    /* MAIN */
+    main { padding: 28px; overflow-y: auto; }
+
+    .section-hdr {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+
+    .section-title {
+      font-size: 11px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--text-dim);
+    }
+
+    .section-title span { color: var(--green); }
+
+    .btn {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      padding: 6px 14px;
+      border-radius: 4px;
+      border: 1px solid var(--border2);
+      background: var(--panel);
+      color: var(--text);
+      cursor: pointer;
+      transition: all .15s;
+      letter-spacing: 0.05em;
+    }
+
+    .btn:hover { border-color: var(--green); color: var(--green); box-shadow: var(--glow-g); }
+    .btn.primary { background: #0d2a1a; border-color: var(--green); color: var(--green); }
+
+    /* STATS */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+
+    .stat-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 16px 18px;
+      position: relative;
+      overflow: hidden;
+      transition: border-color .2s;
+    }
+
+    .stat-card:hover { border-color: var(--border2); }
+
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 2px;
+    }
+
+    .stat-card.green::before { background: var(--green); box-shadow: var(--glow-g); }
+    .stat-card.red::before   { background: var(--red);   box-shadow: var(--glow-r); }
+    .stat-card.blue::before  { background: var(--blue);  box-shadow: var(--glow-b); }
+    .stat-card.yellow::before{ background: var(--yellow);}
+
+    .stat-label { font-size: 9px; letter-spacing: 0.14em; color: var(--text-muted); text-transform: uppercase; margin-bottom: 8px; }
+    .stat-value { font-size: 28px; font-weight: 700; line-height: 1; }
+    .stat-card.green  .stat-value { color: var(--green);  text-shadow: var(--glow-g); }
+    .stat-card.red    .stat-value { color: var(--red);    text-shadow: var(--glow-r); }
+    .stat-card.blue   .stat-value { color: var(--blue);   text-shadow: var(--glow-b); }
+    .stat-card.yellow .stat-value { color: var(--yellow); }
+
+    .stat-sub { font-size: 10px; color: var(--text-muted); margin-top: 6px; }
+
+    .mini-chart {
+      display: flex;
+      align-items: flex-end;
+      gap: 3px;
+      height: 28px;
+      margin-top: 8px;
+    }
+    .mini-bar {
+      flex: 1;
+      border-radius: 2px 2px 0 0;
+      min-height: 4px;
+      background: var(--green);
+      opacity: 0.45;
+    }
+    .mini-bar:last-child { opacity: 1; }
+    .mini-bar.fail { background: var(--red); }
+
+    /* TABLE */
+    .table-wrap {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+      margin-bottom: 28px;
+    }
+
+    .table-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 18px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .table-title { font-size: 11px; color: var(--text-dim); letter-spacing: 0.1em; }
+
+    .filter-row { display: flex; gap: 6px; }
+
+    .filter-btn {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      padding: 3px 10px;
+      border-radius: 3px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-dim);
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .filter-btn.active, .filter-btn:hover {
+      border-color: var(--green);
+      color: var(--green);
+    }
+
+    table { width: 100%; border-collapse: collapse; }
+
+    thead th {
+      text-align: left;
+      font-size: 9px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      padding: 10px 18px;
+      border-bottom: 1px solid var(--border);
+      font-weight: 400;
+    }
+
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+      transition: background .12s;
+      cursor: pointer;
+    }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: #151e28; }
+    tbody td { padding: 12px 18px; font-size: 12px; }
+
+    .pipeline-name   { color: var(--text); font-weight: 500; }
+    .pipeline-branch { font-size: 10px; color: var(--text-dim); margin-top: 2px; }
+
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 10px;
+      padding: 2px 8px;
+      border-radius: 3px;
+      font-weight: 500;
+    }
+
+    .tag.success { background: #0a2217; color: var(--green);  border: 1px solid #1a4030; }
+    .tag.failed  { background: #200d12; color: var(--red);    border: 1px solid #40161e; }
+    .tag.running { background: #0d1e2e; color: var(--blue);   border: 1px solid #1a3a50; }
+    .tag.pending { background: #1e1a0a; color: var(--yellow); border: 1px solid #3a3010; }
+
+    .tag .dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+    .tag.running .dot { animation: pulse 1s infinite; }
+
+    .duration    { color: var(--text-dim); font-size: 11px; }
+    .commit-hash { color: var(--purple); font-size: 10px; font-family: 'Share Tech Mono', monospace; }
+    .trigger-by  { font-size: 10px; color: var(--text-dim); }
+    .time-ago    { font-size: 10px; color: var(--text-muted); }
+
+    .progress-bar  { height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; margin-top: 6px; }
+    .progress-fill { height: 100%; background: var(--blue); box-shadow: var(--glow-b); border-radius: 2px; transition: width .4s; }
+
+    .action-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      border-radius: 3px;
+      color: var(--text-dim);
+      font-size: 10px;
+      padding: 3px 8px;
+      cursor: pointer;
+      font-family: 'JetBrains Mono', monospace;
+      transition: all .15s;
+    }
+    .action-btn:hover { border-color: var(--green); color: var(--green); }
+
+    /* BOTTOM GRID */
+    .bottom-grid {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 18px;
+    }
+
+    /* TERMINAL */
+    .terminal {
+      background: #060a0d;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .terminal-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .term-dot { width: 10px; height: 10px; border-radius: 50%; }
+    .term-dot.r { background: var(--red); }
+    .term-dot.y { background: var(--yellow); }
+    .term-dot.g { background: var(--green); }
+
+    .terminal-title { font-size: 10px; color: var(--text-dim); margin-left: 6px; letter-spacing: 0.1em; }
+
+    .log-body {
+      padding: 14px;
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      line-height: 1.9;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .log-body::-webkit-scrollbar { width: 4px; }
+    .log-body::-webkit-scrollbar-track { background: transparent; }
+    .log-body::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+    .log-line { display: flex; gap: 12px; }
+    .log-time { color: var(--text-muted); min-width: 56px; }
+    .log-msg  { color: var(--text-dim); }
+    .log-msg.ok   { color: var(--green); }
+    .log-msg.err  { color: var(--red);   }
+    .log-msg.info { color: var(--blue);  }
+    .log-msg.warn { color: var(--yellow);}
+
+    .cursor-blink {
+      display: inline-block;
+      width: 8px; height: 13px;
+      background: var(--green);
+      animation: blink .8s steps(1) infinite;
+      vertical-align: middle;
+      margin-left: 4px;
+    }
+    @keyframes blink { 0%,49%{ opacity:1; } 50%,100%{ opacity:0; } }
+
+    /* ACTIVITY */
+    .activity {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .activity-hdr {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      font-size: 10px;
+      letter-spacing: 0.12em;
+      color: var(--text-dim);
+      text-transform: uppercase;
+    }
+
+    .feed { padding: 8px 0; max-height: 300px; overflow-y: auto; }
+    .feed::-webkit-scrollbar { width: 3px; }
+    .feed::-webkit-scrollbar-thumb { background: var(--border2); }
+
+    .feed-item {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      padding: 8px 16px;
+      border-bottom: 1px solid #0e1620;
+      transition: background .12s;
+    }
+    .feed-item:hover { background: #151e28; }
+    .feed-item:last-child { border-bottom: none; }
+
+    .feed-icon {
+      width: 26px; height: 26px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      font-size: 11px;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .feed-icon.ok   { background: #0a2217; color: var(--green); }
+    .feed-icon.fail { background: #200d12; color: var(--red);   }
+    .feed-icon.run  { background: #0d1e2e; color: var(--blue);  }
+    .feed-icon.info { background: #1a1a30; color: var(--purple);}
+
+    .feed-main { font-size: 11px; color: var(--text); line-height: 1.4; }
+    .feed-meta { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+
+    /* ANIMATIONS */
+    @keyframes fadeInUp {
+      from { opacity:0; transform: translateY(12px); }
+      to   { opacity:1; transform: translateY(0); }
+    }
+    .stat-card   { animation: fadeInUp .4s ease both; }
+    .stat-card:nth-child(1) { animation-delay: .05s; }
+    .stat-card:nth-child(2) { animation-delay: .10s; }
+    .stat-card:nth-child(3) { animation-delay: .15s; }
+    .stat-card:nth-child(4) { animation-delay: .20s; }
+    .table-wrap, .terminal, .activity { animation: fadeInUp .35s ease both; }
+
+    @media (max-width: 900px) {
+      .shell { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+      .stats-row { grid-template-columns: repeat(2,1fr); }
+      .bottom-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="logo">
+    <div class="logo-icon">⬡</div>
+    PIPELINE<span style="color:var(--text-dim);font-weight:300;">OS</span>
+  </div>
+  <div class="topbar-center">
+    <div class="status-dot"></div>
+    <span>All systems operational</span>
+    <span style="color:var(--border2);margin:0 6px">|</span>
+    <span>3 pipelines running</span>
+  </div>
+  <div class="topbar-right">
+    <span>ENV: <span style="color:var(--green)">production</span></span>
+    <span>v2.4.1</span>
+    <span class="clock" id="clock">--:--:--</span>
+  </div>
+</header>
+
+<div class="shell">
+
+  <nav class="sidebar">
+    <div class="sidebar-section">Navigation</div>
+    <div class="nav-item active">⬡ &nbsp;Dashboard</div>
+    <div class="nav-item">⊞ &nbsp;Pipelines <span class="badge ok">12</span></div>
+    <div class="nav-item">⟳ &nbsp;Runs <span class="badge">3</span></div>
+    <div class="nav-item">◈ &nbsp;Artifacts</div>
+    <div class="nav-item">⎔ &nbsp;Environments</div>
+
+    <div class="sidebar-section">Monitoring</div>
+    <div class="nav-item">▣ &nbsp;Metrics</div>
+    <div class="nav-item">⊡ &nbsp;Logs</div>
+    <div class="nav-item">◉ &nbsp;Alerts <span class="badge">2</span></div>
+
+    <div class="sidebar-section">Config</div>
+    <div class="nav-item">⚙ &nbsp;Settings</div>
+    <div class="nav-item">⊛ &nbsp;Integrations</div>
+    <div class="nav-item">⊞ &nbsp;Team</div>
+
+    <div style="margin-top:auto;padding:16px;border-top:1px solid var(--border);margin:auto 0 0 0">
+      <div style="font-size:10px;color:var(--text-muted)">Logged in as</div>
+      <div style="font-size:12px;color:var(--green);margin-top:4px">@devops-admin</div>
+    </div>
+  </nav>
+
+  <main>
+
+    <div class="section-hdr">
+      <div>
+        <div class="section-title">// <span>CI/CD PIPELINE TRACKER</span></div>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:4px" id="sync-label">Last synced 12 seconds ago</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn" id="refresh-btn" onclick="refreshAll()">↺ Refresh</button>
+        <button class="btn primary">+ New Pipeline</button>
+      </div>
+    </div>
+
+    <div class="stats-row">
+      <div class="stat-card green">
+        <div class="stat-label">Successful</div>
+        <div class="stat-value">47</div>
+        <div class="stat-sub">↑ 8 today</div>
+        <div class="mini-chart">
+          <div class="mini-bar" style="height:40%"></div>
+          <div class="mini-bar" style="height:65%"></div>
+          <div class="mini-bar" style="height:50%"></div>
+          <div class="mini-bar" style="height:80%"></div>
+          <div class="mini-bar" style="height:60%"></div>
+          <div class="mini-bar" style="height:90%"></div>
+          <div class="mini-bar" style="height:100%"></div>
+        </div>
+      </div>
+      <div class="stat-card red">
+        <div class="stat-label">Failed</div>
+        <div class="stat-value">6</div>
+        <div class="stat-sub">↓ 2 from yesterday</div>
+        <div class="mini-chart">
+          <div class="mini-bar fail" style="height:60%"></div>
+          <div class="mini-bar fail" style="height:30%"></div>
+          <div class="mini-bar fail" style="height:80%"></div>
+          <div class="mini-bar fail" style="height:50%"></div>
+          <div class="mini-bar fail" style="height:40%"></div>
+          <div class="mini-bar fail" style="height:70%"></div>
+          <div class="mini-bar fail" style="height:100%"></div>
+        </div>
+      </div>
+      <div class="stat-card blue">
+        <div class="stat-label">Running</div>
+        <div class="stat-value">3</div>
+        <div class="stat-sub">Avg 4m 22s duration</div>
+      </div>
+      <div class="stat-card yellow">
+        <div class="stat-label">Success Rate</div>
+        <div class="stat-value">88<span style="font-size:16px">%</span></div>
+        <div class="stat-sub">7-day rolling avg</div>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <div class="table-header">
+        <div class="table-title">// RECENT PIPELINE RUNS</div>
+        <div class="filter-row">
+          <button class="filter-btn active" onclick="filterTable('all',this)">All</button>
+          <button class="filter-btn" onclick="filterTable('success',this)">Success</button>
+          <button class="filter-btn" onclick="filterTable('failed',this)">Failed</button>
+          <button class="filter-btn" onclick="filterTable('running',this)">Running</button>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Pipeline</th>
+            <th>Status</th>
+            <th>Duration</th>
+            <th>Commit</th>
+            <th>Triggered By</th>
+            <th>Started</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="pipeline-body"></tbody>
+      </table>
+    </div>
+
+    <div class="bottom-grid">
+      <div class="terminal">
+        <div class="terminal-bar">
+          <div class="term-dot r"></div>
+          <div class="term-dot y"></div>
+          <div class="term-dot g"></div>
+          <div class="terminal-title" id="terminal-title">build.log — frontend-deploy #142</div>
+        </div>
+        <div class="log-body" id="log-body"></div>
+      </div>
+
+      <div class="activity">
+        <div class="activity-hdr">// Activity Feed</div>
+        <div class="feed" id="feed-body"></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script>
+  // CLOCK
+  function tick() {
+    document.getElementById('clock').textContent =
+      new Date().toTimeString().slice(0,8);
+  }
+  tick();
+  setInterval(tick, 1000);
+
+  // DATA
+  const pipelines = [
+    { name:'frontend-deploy',  branch:'main',         status:'running', duration:'2m 14s', commit:'a3f9d2c', by:'@nadia',  ago:'just now' },
+    { name:'api-gateway',      branch:'release/2.4',  status:'success', duration:'5m 08s', commit:'b82e1a0', by:'@ravi',   ago:'4m ago' },
+    { name:'auth-service',     branch:'main',         status:'failed',  duration:'1m 32s', commit:'c91f4b7', by:'@meera',  ago:'9m ago' },
+    { name:'db-migration',     branch:'hotfix/001',   status:'success', duration:'3m 55s', commit:'d04c3e1', by:'CI bot',  ago:'18m ago' },
+    { name:'k8s-infra',        branch:'main',         status:'running', duration:'6m 01s', commit:'e77a2f9', by:'@arjun',  ago:'22m ago' },
+    { name:'notification-svc', branch:'feature/smtp', status:'pending', duration:'—',      commit:'f13d8c4', by:'@nadia',  ago:'31m ago' },
+    { name:'data-pipeline',    branch:'main',         status:'success', duration:'8m 20s', commit:'a88b1d2', by:'@ravi',   ago:'45m ago' },
+    { name:'worker-queue',     branch:'main',         status:'failed',  duration:'0m 48s', commit:'b55e7f0', by:'CI bot',  ago:'1h ago'  },
+  ];
+
+  function renderTable(filter) {
+    const rows = filter && filter !== 'all'
+      ? pipelines.filter(p => p.status === filter)
+      : pipelines;
+    document.getElementById('pipeline-body').innerHTML = rows.map(p => `
+      <tr data-status="${p.status}">
+        <td>
+          <div class="pipeline-name">${p.name}</div>
+          <div class="pipeline-branch">⎇ ${p.branch}</div>
+        </td>
+        <td>
+          <span class="tag ${p.status}"><span class="dot"></span>${p.status}</span>
+          ${p.status === 'running'
+            ? `<div class="progress-bar"><div class="progress-fill" style="width:${Math.floor(Math.random()*50+30)}%"></div></div>`
+            : ''}
+        </td>
+        <td class="duration">${p.duration}</td>
+        <td class="commit-hash">${p.commit}</td>
+        <td class="trigger-by">${p.by}</td>
+        <td class="time-ago">${p.ago}</td>
+        <td>
+          <button class="action-btn" onclick="event.stopPropagation();openLog('${p.name}')">logs</button>
+          ${p.status === 'failed'
+            ? `<button class="action-btn" style="margin-left:4px;color:var(--yellow);border-color:var(--yellow)">retry</button>`
+            : ''}
+        </td>
+      </tr>`).join('');
+  }
+
+  function filterTable(f, btn) {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderTable(f);
+  }
+
+  renderTable('all');
+
+  // LOGS
+  const logLines = [
+    { t:'09:12:01', msg:'Cloning repository...', cls:'info' },
+    { t:'09:12:02', msg:'✔ Repository cloned (depth=1)', cls:'ok' },
+    { t:'09:12:03', msg:'Installing dependencies (npm ci)', cls:'' },
+    { t:'09:12:14', msg:'✔ 1284 packages installed in 11.2s', cls:'ok' },
+    { t:'09:12:14', msg:'Running lint checks...', cls:'' },
+    { t:'09:12:17', msg:'✔ ESLint passed — 0 errors, 2 warnings', cls:'ok' },
+    { t:'09:12:17', msg:'Running unit tests (jest)', cls:'' },
+    { t:'09:12:28', msg:'✔ 148 tests passed, 0 failed', cls:'ok' },
+    { t:'09:12:28', msg:'Building production bundle (vite)...', cls:'' },
+    { t:'09:12:44', msg:'✔ dist/ 2.3 MB  gzip: 634 KB', cls:'ok' },
+    { t:'09:12:44', msg:'Pushing image to registry...', cls:'info' },
+    { t:'09:12:58', msg:'✔ Image pushed: registry.io/app:a3f9d2c', cls:'ok' },
+    { t:'09:12:58', msg:'Deploying to k8s cluster (prod)...', cls:'info' },
+    { t:'09:13:10', msg:'↻ Rolling update in progress...', cls:'warn' },
+  ];
+
+  function renderLogs() {
+    document.getElementById('log-body').innerHTML =
+      logLines.map(l => `
+        <div class="log-line">
+          <span class="log-time">${l.t}</span>
+          <span class="log-msg ${l.cls}">${l.msg}</span>
+        </div>`).join('') + `
+      <div class="log-line">
+        <span class="log-time">09:13:14</span>
+        <span class="log-msg warn">Waiting for pods to be ready<span class="cursor-blink"></span></span>
+      </div>`;
+    document.getElementById('log-body').scrollTop = 9999;
+  }
+
+  renderLogs();
+
+  function openLog(name) {
+    document.getElementById('terminal-title').textContent = `build.log — ${name}`;
+  }
+
+  // ACTIVITY FEED
+  const feedItems = [
+    { icon:'✔', cls:'ok',   main:'frontend-deploy #142 triggered by @nadia', meta:'just now' },
+    { icon:'✔', cls:'ok',   main:'api-gateway #89 completed in 5m 08s', meta:'4 min ago' },
+    { icon:'✗', cls:'fail', main:'auth-service #56 failed at step: docker-build', meta:'9 min ago' },
+    { icon:'↻', cls:'run',  main:'k8s-infra #31 started — rolling deploy', meta:'22 min ago' },
+    { icon:'⊛', cls:'info', main:'New secret DB_PASS added to production vault', meta:'38 min ago' },
+    { icon:'✔', cls:'ok',   main:'data-pipeline #200 passed all 32 checks', meta:'45 min ago' },
+    { icon:'✗', cls:'fail', main:'worker-queue #77 timeout after 48s', meta:'1 hour ago' },
+    { icon:'⊛', cls:'info', main:'@arjun updated k8s-infra pipeline config', meta:'2 hours ago' },
+  ];
+
+  document.getElementById('feed-body').innerHTML = feedItems.map(f => `
+    <div class="feed-item">
+      <div class="feed-icon ${f.cls}">${f.icon}</div>
+      <div>
+        <div class="feed-main">${f.main}</div>
+        <div class="feed-meta">${f.meta}</div>
+      </div>
+    </div>`).join('');
+
+  // REFRESH
+  function refreshAll() {
+    const btn = document.getElementById('refresh-btn');
+    btn.textContent = '↺ Syncing...';
+    btn.disabled = true;
+    setTimeout(() => {
+      btn.textContent = '↺ Refresh';
+      btn.disabled = false;
+      document.getElementById('sync-label').textContent = 'Last synced just now';
+    }, 1200);
+  }
+
+  // LIVE RUNNING TIMER
+  let secs = 134;
+  setInterval(() => {
+    secs++;
+    const m = Math.floor(secs/60), s = String(secs%60).padStart(2,'0');
+    document.querySelectorAll('tr[data-status="running"] .duration')
+      .forEach(d => { d.textContent = `${m}m ${s}s`; });
+  }, 1000);
+</script>
+</body>
+</html>
